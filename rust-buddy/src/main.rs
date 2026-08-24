@@ -160,8 +160,10 @@ fn main() -> glib::ExitCode {
                 let now = glib::monotonic_time();
                 match c.mode {
                     Mode::Hidden | Mode::Draw => {
-                        // comet trail: each point fades individually, tail-first
-                        render_trail(cr, &c.trail, now);
+                        // comet trail: each point fades individually, tail-first;
+                        // ink color matches the buddy (cursor_color)
+                        let col = parse_hex_color(&c.cursor_color);
+                        render_trail(cr, &c.trail, now, col);
                     }
                     Mode::Fly { sx, sy, tx, ty, t0, dur, .. } => {
                         // full bezier path faint + progress head glow

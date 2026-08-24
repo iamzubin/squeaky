@@ -1,4 +1,5 @@
-//! Red marker ink + comet-trail decay rendering.
+//! Marker ink + comet-trail decay rendering, colored to match the buddy
+//! (cursor_color from settings).
 //!
 //! The core heyclicky move: hold hotkey, ink trails your cursor, decaying
 //! tail-first while you draw. Every point ages individually: full alpha for
@@ -6,10 +7,8 @@
 
 use std::f64::consts::PI;
 
-pub const INK_R: f64 = 0.96;
-pub const INK_G: f64 = 0.22;
-pub const INK_B: f64 = 0.35; // heyclicky marker red #F53859
-pub const INK_W: f64 = 5.0;  // core stroke width (logical px)
+/// Fallback handled by main.rs parse_hex_color (matches default cursor_color).
+pub const INK_W: f64 = 5.0; // core stroke width (logical px)
 
 pub const TRAIL_HOLD_MS: i64 = 900;  // point stays full alpha this long
 pub const TRAIL_FADE_MS: i64 = 1200; // then fades to nothing over this long
@@ -41,7 +40,7 @@ fn ink_path(cr: &cairo::Context, pts: &[(f64, f64)]) {
     cr.line_to(last.0, last.1);
 }
 
-fn draw_ink(cr: &cairo::Context, pts: &[(f64, f64)], alpha: f64) {
+fn draw_ink(cr: &cairo::Context, pts: &[(f64, f64)], alpha: f64, col: (f64, f64, f64)) {
     if alpha <= 0.0 || pts.is_empty() {
         return;
     }
@@ -50,22 +49,22 @@ fn draw_ink(cr: &cairo::Context, pts: &[(f64, f64)], alpha: f64) {
     if pts.len() == 1 {
         // click w/o move -> dot
         let (x, y) = pts[0];
-        cr.set_source_rgba(INK_R, INK_G, INK_B, 0.25 * alpha);
+        cr.set_source_rgba(col.0, col.1, col.2, 0.25 * alpha);
         cr.arc(x, y, INK_W * 1.6, 0.0, 2.0 * PI);
         let _ = cr.fill();
-        cr.set_source_rgba(INK_R, INK_G, INK_B, 0.92 * alpha);
+        cr.set_source_rgba(col.0, col.1, col.2, 0.92 * alpha);
         cr.arc(x, y, INK_W / 2.0, 0.0, 2.0 * PI);
         let _ = cr.fill();
         return;
     }
     // glow pass
     ink_path(cr, pts);
-    cr.set_source_rgba(INK_R, INK_G, INK_B, 0.25 * alpha);
+    cr.set_source_rgba(col.0, col.1, col.2, 0.25 * alpha);
     cr.set_line_width(INK_W * 2.2);
     let _ = cr.stroke();
     // core pass
     ink_path(cr, pts);
-    cr.set_source_rgba(INK_R, INK_G, INK_B, 0.92 * alpha);
+    cr.set_source_rgba(col.0, col.1, col.2, 0.92 * alpha);
     cr.set_line_width(INK_W);
     let _ = cr.stroke();
 }
@@ -84,13 +83,14 @@ fn point_alpha(now: i64, t_birth: i64) -> f64 {
 
 /// Render the trail as overlapping-by-one-point bands, each at its tail's
 /// alpha -> smooth tail-first gradient, every segment painted exactly once.
-pub fn render_trail(cr: &cairo::Context, trail: &[(f64, f64, i64)], now: i64) {
+/// Color follows the buddy (cursor_color) so ink and sprite always match.
+pub fn render_trail(cr: &cairo::Context, trail: &[(f64, f64, i64)], now: i64, col: (f64, f64, f64)) {
     if trail.is_empty() {
         return;
     }
     if trail.len() == 1 {
         let p = &trail[0];
-        draw_ink(cr, &[(p.0, p.1)], point_alpha(now, p.2));
+        draw_ink(cr, &[(p.0, p.1)], point_alpha(now, p.2), col);
         return;
     }
     let mut i = 0;
@@ -99,7 +99,7 @@ pub fn render_trail(cr: &cairo::Context, trail: &[(f64, f64, i64)], now: i64) {
         let a = point_alpha(now, trail[i].2);
         if a > 0.0 {
             let pts: Vec<(f64, f64)> = trail[i..e].iter().map(|p| (p.0, p.1)).collect();
-            draw_ink(cr, &pts, a);
+            draw_ink(cr, &pts, a, col);
         }
         i = e - 1;
     }
