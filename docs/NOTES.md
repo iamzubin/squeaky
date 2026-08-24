@@ -133,6 +133,17 @@ Sidecar avoids blocking the 16ms ink loop. It watches `sessions.jsonl`, runs the
 - **DDG scrape** (`html.duckduckgo.com/html/?q=`): needs a browser UA;
   result links are `//duckduckgo.com/l/?uddg=<percent-encoded>&rut=…` —
   unwrap `uddg=` (scraper decodes the `&amp;` entities already).
+- **Director feed** (`~/.local/state/heyclicky/director.jsonl`): the
+  sidecar→buddy command channel (ambient-agent state-file pattern). Events:
+  `{"cmd":"fly","x":..,"y":..,"label":"click here"}` (bezier flight + label
+  bubble), `{"cmd":"say","text":"…"}` (bubble at buddy, hold scales with
+  length). Buddy polls mtime per tick; line-count cursor replays on
+  truncation. `agent_busy` is RMW'd into status.json by the agent around
+  each turn (races with buddy voice writes are possible but harmless v1).
+- **Vision**: zen free models accept OpenAI `image_url` data URIs — verified
+  mimo-v2.5-free / big-pickle / hy3-free; nemotron rejects images ("No
+  endpoints found that support image input") and rotates past. OVH's
+  anonymous Qwen2.5-VL-72B reads screen text OCR-grade.
 - Keys live in keyring only: `secret-tool lookup service squeaky account
   <id>` (tavily/exa/brave backends activate when their key exists).
 

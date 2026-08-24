@@ -32,9 +32,11 @@
   - [x] Search registry: ddgs/searxng/brave/tavily/exa chain, key-aware
         auto order, ring failover + `web_extract` readability-lite
         (`search.rs`); one-shot tool loop: `squeaky-agent ask "…"`
-  - [ ] sessions.jsonl watcher → turn a pen session into the `ask` flow
-  - [ ] jobs feed writer (~/.local/state/heyclicky/jobs.jsonl) + status
-        agent_busy flips true while a job runs
+  - [x] sessions.jsonl watcher — `squeaky-agent watch` auto-reacts to every
+        pen release (400ms poll, head-tracking so history isn't replayed)
+  - [ ] jobs feed writer (~/.local/state/heyclicky/jobs.jsonl) — agent_reply
+        events already land in sessions.jsonl; formal jobs feed for the
+        panel's AGENT JOBS list is the remaining piece
 - [ ] Distribution kit: PKGBUILD (`heyclicky-bin`), installer script
       (voxtype pattern), systemd user unit, .desktop + icon
 - [ ] Multi-monitor: per-output overlay surfaces + capture all displays

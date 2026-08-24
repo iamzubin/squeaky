@@ -54,6 +54,7 @@ async fn main() -> Result<()> {
     match mode.as_str() {
         "ask" if !arg.is_empty() => ask(&arg).await,
         "handle-session" => handle_session(if arg.is_empty() { None } else { Some(arg) }).await,
+        "watch" => watch().await,
         "llm-test" => {
             let p = if arg.is_empty() { "Say OK".to_string() } else { arg };
             llm_test(&p).await
@@ -64,6 +65,7 @@ async fn main() -> Result<()> {
             println!("usage: squeaky-agent <mode>");
             println!("  ask \"<prompt>\"       one-shot agent w/ search + screen pointing");
             println!("  handle-session [id]  react to latest (or given) pen session");
+            println!("  watch                daemon: auto-react to every pen release");
             println!("  llm-test [prompt]    streaming chat via the provider ring");
             println!("  search-test <query>  search chain end-to-end");
             println!("  extract-test <url>   readability-lite extraction");
@@ -201,6 +203,35 @@ async fn exec_tool(
 }
 
 // --- pen-session flow -------------------------------------------------------------
+
+/// Daemon mode: tail sessions.jsonl and run a turn per new ink_session.
+/// Startup marks the current newest session as seen (no replay of history).
+async fn watch() -> Result<()> {
+    let last = load_session(None).map(|(s, _)| s["id"].as_str().unwrap_or("").to_string());
+    let mut last_id = match &last {
+        Ok(id) if !id.is_empty() => {
+            println!("WATCH: tailing sessions.jsonl (current head {})", id);
+            id.clone()
+        }
+        _ => {
+            println!("WATCH: tailing sessions.jsonl (no sessions yet)");
+            String::new()
+        }
+    };
+    loop {
+        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        let Ok((session, _)) = load_session(None) else { continue };
+        let id = session["id"].as_str().unwrap_or_default().to_string();
+        if id.is_empty() || id == last_id {
+            continue;
+        }
+        println!("WATCH: new pen session {} — reacting", id);
+        last_id = id.clone();
+        if let Err(e) = handle_session(Some(id)).await {
+            eprintln!("WATCH: turn failed: {}", e);
+        }
+    }
+}
 
 /// Latest (or requested) ink_session record + its transcript events.
 fn load_session(id: Option<&str>) -> Result<(serde_json::Value, Vec<String>)> {

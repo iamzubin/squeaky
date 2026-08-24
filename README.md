@@ -45,12 +45,15 @@ STT reuses voxtype's GGML models from `~/.local/share/voxtype/models/` or `~/.lo
 ```bash
 cd rust-agent
 cargo build --release
-./target/release/squeaky-agent ask "research question here"  # LLM + web_search/web_extract loop
-./target/release/squeaky-agent llm-test                      # streaming chat via the provider ring
-./target/release/squeaky-agent search-test "query"           # search chain end-to-end
+./target/release/squeaky-agent watch                        # THE PRODUCT: auto-react to every pen release
+./target/release/squeaky-agent ask "research question"      # one-shot agent loop
+./target/release/squeaky-agent handle-session               # re-run the latest pen session
+./target/release/squeaky-agent search-test "query"          # search chain end-to-end
 ```
 
-Zero config: keyless opencode zen free tier w/ model rotation, local ollama fallback, DuckDuckGo search. API keys are read from the keyring only (`secret-tool lookup service squeaky account tavily|exa|brave|<provider>`) — never from files.
+Zero config: keyless opencode zen free tier (vision: mimo-v2.5-free / big-pickle / hy3-free) → anonymous OVH Qwen2.5-VL/Llama-70B → anonymous LLM7.io → local ollama, rotating automatically when a model is down or rate-limited. DuckDuckGo search needs no key either. API keys (tavily/exa/brave/any provider) are read from the keyring only (`secret-tool lookup service squeaky account <id>`) — never from files.
+
+The agent can guide you on screen: its `point_at(x,y,label)` / `say(text)` tool calls append to `~/.local/state/heyclicky/director.jsonl`, which rust-buddy tails — the buddy flies there and holds the label bubble.
 
 ## Omarchy plugin
 
