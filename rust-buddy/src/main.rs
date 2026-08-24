@@ -95,6 +95,7 @@ fn main() -> glib::ExitCode {
         settings::publish_status(&settings::Status {
             listening: false,
             transcribing: false,
+            agent_busy: false,
             model: cfg.model.clone(),
             last_transcript: String::new(),
         });
@@ -298,6 +299,7 @@ fn main() -> glib::ExitCode {
                     settings::publish_status(&settings::Status {
                         listening: false,
                         transcribing: false,
+                        agent_busy: false,
                         model: c.model_name.clone(),
                         last_transcript: c.last_transcript.clone(),
                     });

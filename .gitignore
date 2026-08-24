@@ -14,3 +14,4 @@ docs/todo.md.bak
 # whisper models (large, user-local)
 *.bin
 *.ggml
+target/

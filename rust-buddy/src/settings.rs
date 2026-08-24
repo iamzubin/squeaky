@@ -124,6 +124,9 @@ pub fn list_models() -> Vec<String> {
 pub struct Status {
     pub listening: bool,
     pub transcribing: bool,
+    /// true while an agent job runs (agent leg); panel pulses its green dot
+    /// off this — QML already reads it (`s.agent_busy === true`).
+    pub agent_busy: bool,
     pub model: String,
     pub last_transcript: String,
 }

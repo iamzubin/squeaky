@@ -1,15 +1,11 @@
 # heyclicky — TODO
 
-## Cursor redesign (rust side)
+## Cursor redesign (rust side) — DONE
 
-- [ ] **Buddy shape: simple triangle, slightly curved bottom** — like the
-      reference (rounded triangle, tip up-left). Replaces the arrow PNG.
-  - Draw with cairo at render time: shape = f(size, color) → runtime
-    recolor for free, no asset, crisp at any scale
-  - HOT_X/HOT_Y derived from shape geometry
-- [ ] **Consume `cursor_color` from settings.json** — rust Settings struct
-  currently ignores it (serde skips unknown fields, so the panel's writes
-  round-trip safely); wire it into the cairo draw + hot-reload
+- [x] **Buddy shape: simple triangle, slightly curved bottom** — cairo path at
+      render time (main.rs draw_func), runtime recolor, no asset
+- [x] **Consume `cursor_color` from settings.json** — wired into the cairo
+      draw + hot-reload (queue_draw on change)
 
 ## Omarchy plugin (zubin.heyclicky) — DONE-ish
 
@@ -22,15 +18,23 @@
   - [ ] rust: agent job lifecycle (spawn/track/finish) + write jobs feed
         (proposal: `~/.local/state/heyclicky/jobs.jsonl`, same append style
         as sessions.jsonl)
-  - [ ] rust: `agent_busy` field in status.json (dot goes live for agents,
-        currently demos off transcribing)
+  - [x] rust: `agent_busy` field in status.json (published false until the
+        agent leg lands; QML already reads it, dot no longer demos off
+        transcribing)
   - [ ] qml: parse jobs feed → list rows (Model.js gets parseJobs)
 
 ## Roadmap (already discussed)
 
-- [ ] Agent leg: transcript + annotated screenshot + bbox → LLM → streamed
-      reply → buddy bubble + flight (`flight.rs` is ready, needs real input)
-      — this is what creates agent jobs
+- [ ] Agent leg — **registries landed** (`rust-agent/` → `squeaky-agent`):
+  - [x] LLM registry: opencode zen free ring w/ model rotation on
+        429/down/5xx, ollama fallback, keyed providers via keyring,
+        streaming SSE + native tool-calling (`llm.rs`)
+  - [x] Search registry: ddgs/searxng/brave/tavily/exa chain, key-aware
+        auto order, ring failover + `web_extract` readability-lite
+        (`search.rs`); one-shot tool loop: `squeaky-agent ask "…"`
+  - [ ] sessions.jsonl watcher → turn a pen session into the `ask` flow
+  - [ ] jobs feed writer (~/.local/state/heyclicky/jobs.jsonl) + status
+        agent_busy flips true while a job runs
 - [ ] Distribution kit: PKGBUILD (`heyclicky-bin`), installer script
       (voxtype pattern), systemd user unit, .desktop + icon
 - [ ] Multi-monitor: per-output overlay surfaces + capture all displays

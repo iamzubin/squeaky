@@ -12,6 +12,8 @@ squeaky/
     src/            # state, hotkey (evdev), ink, hypr IPC, session, stt (whisper-rs), settings
     assets/         # embedded cursor.png
     Cargo.toml
+  rust-agent/        # sidecar brain: LLM + web search registries (Rust, tokio)
+    src/            # llm (zen-free ring/ollama/keyed), search (ddgs/searxng/brave/tavily/exa), config
   omarchy-plugin/   # Quickshell bar widget (zubin.heyclicky)
     manifest.json
     Panel.qml       # waybar button (triangle, matches bar foreground) + cursor color, gap, agent jobs
@@ -37,6 +39,18 @@ cargo build --release
 ```
 
 STT reuses voxtype's GGML models from `~/.local/share/voxtype/models/` or `~/.local/share/heyclicky/models/` (no download if voxtype installed). Config hot-reloaded from `~/.config/heyclicky/settings.json`.
+
+## Agent sidecar
+
+```bash
+cd rust-agent
+cargo build --release
+./target/release/squeaky-agent ask "research question here"  # LLM + web_search/web_extract loop
+./target/release/squeaky-agent llm-test                      # streaming chat via the provider ring
+./target/release/squeaky-agent search-test "query"           # search chain end-to-end
+```
+
+Zero config: keyless opencode zen free tier w/ model rotation, local ollama fallback, DuckDuckGo search. API keys are read from the keyring only (`secret-tool lookup service squeaky account tavily|exa|brave|<provider>`) — never from files.
 
 ## Omarchy plugin
 
