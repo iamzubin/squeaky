@@ -1,0 +1,16 @@
+# Rust
+rust-buddy/target/
+
+# OS / editors
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+
+# Omarchy / local state (never commit)
+docs/todo.md.bak
+
+# whisper models (large, user-local)
+*.bin
+*.ggml

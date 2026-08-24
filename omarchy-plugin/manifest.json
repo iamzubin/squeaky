@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "zubin.heyclicky",
+  "name": "Heyclicky",
+  "version": "0.1.0",
+  "author": "iamzubin",
+  "license": "MIT",
+  "description": "heyclicky buddy control: cursor color, voice toggle, and recent ink sessions.",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Heyclicky",
+    "description": "Triangle buddy icon; panel with cursor color, voice settings, and recent sessions.",
+    "category": "AI",
+    "aliases": ["heyclicky"],
+    "allowMultiple": false
+  }
+}
