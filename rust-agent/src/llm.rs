@@ -36,13 +36,15 @@ pub struct ToolFn {
     pub arguments: String,
 }
 
-/// One chat message. `content` is None for pure tool_call turns and for
-/// assistant messages that only reasoned; tool responses carry tool_call_id.
+/// One chat message. `content` is a JSON string for plain turns or an
+/// array of content parts for vision turns ([{type:text},{type:image_url}]).
+/// Tool responses carry tool_call_id; assistant tool-call turns echo back
+/// tool_calls and may have null content.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Msg {
     pub role: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub content: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCall>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -52,10 +54,23 @@ pub struct Msg {
 }
 
 impl Msg {
-    pub fn system(t: &str) -> Self { Msg { role: "system".into(), content: Some(t.into()), tool_calls: None, tool_call_id: None, name: None } }
-    pub fn user(t: &str) -> Self { Msg { role: "user".into(), content: Some(t.into()), tool_calls: None, tool_call_id: None, name: None } }
+    pub fn system(t: &str) -> Self { Msg { role: "system".into(), content: serde_json::Value::String(t.into()), tool_calls: None, tool_call_id: None, name: None } }
+    pub fn user(t: &str) -> Self { Msg { role: "user".into(), content: serde_json::Value::String(t.into()), tool_calls: None, tool_call_id: None, name: None } }
+    /// Vision turn: text + one image as a data URI (png/jpeg base64).
+    /// Verified working keyless on zen mimo-v2.5-free/big-pickle/hy3-free
+    /// and OVH Qwen2.5-VL; text-only models error -> ring rotates.
+    pub fn user_vision(t: &str, image_data_uri: &str) -> Self {
+        Msg {
+            role: "user".into(),
+            content: serde_json::json!([
+                { "type": "text", "text": t },
+                { "type": "image_url", "image_url": { "url": image_data_uri } },
+            ]),
+            tool_calls: None, tool_call_id: None, name: None,
+        }
+    }
     pub fn tool_result(call_id: &str, name: &str, out: &str) -> Self {
-        Msg { role: "tool".into(), content: Some(out.into()), tool_calls: None, tool_call_id: Some(call_id.into()), name: Some(name.into()) }
+        Msg { role: "tool".into(), content: serde_json::Value::String(out.into()), tool_calls: None, tool_call_id: Some(call_id.into()), name: Some(name.into()) }
     }
 }
 
@@ -293,11 +308,17 @@ fn parse_choice(v: &serde_json::Value) -> Result<Msg> {
         let emsg = v["error"]["message"].as_str().unwrap_or("unknown error");
         return Err(anyhow!("{}", emsg));
     }
-    let content = msg["content"].as_str().map(|s| s.to_string());
+    // content may be a string, a content-part array (vision echoes), or null
+    let content = match msg["content"] {
+        serde_json::Value::Null => serde_json::Value::Null,
+        ref c @ serde_json::Value::String(_) => c.clone(),
+        ref parts @ serde_json::Value::Array(_) => parts.clone(),
+        _ => serde_json::Value::Null,
+    };
     let tool_calls: Option<Vec<ToolCall>> = msg["tool_calls"]
         .as_array()
         .map(|arr| arr.iter().filter_map(|t| serde_json::from_value(t.clone()).ok()).collect());
-    if content.is_none() && tool_calls.is_none() {
+    if content.is_null() && tool_calls.is_none() {
         return Err(anyhow!("message had neither content nor tool_calls"));
     }
     Ok(Msg { role: "assistant".into(), content, tool_calls, tool_call_id: None, name: None })

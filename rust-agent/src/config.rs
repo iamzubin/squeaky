@@ -148,3 +148,17 @@ pub fn keyring_lookup(account: &str) -> Option<String> {
     let key = String::from_utf8_lossy(&out.stdout).trim().to_string();
     if key.is_empty() { None } else { Some(key) }
 }
+
+/// Append an event to the shared session feed (agent replies, etc).
+pub fn append_session_event(event: &serde_json::Value) {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+    let dir = PathBuf::from(home).join(".local/state/heyclicky");
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true).append(true)
+        .open(dir.join("sessions.jsonl"))
+    {
+        use std::io::Write;
+        let _ = writeln!(f, "{}", event);
+    }
+}
