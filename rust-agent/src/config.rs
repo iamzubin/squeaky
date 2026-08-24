@@ -64,8 +64,13 @@ pub struct Config {
     pub search: SearchCfg,
 }
 
-/// Zero-config default ring: opencode zen free tier (rotates on 429/down),
-/// then local ollama as fallback. Matches docs/spec.md.
+/// Zero-config default ring, ordered by live verification (2026-08-25):
+/// 1. opencode zen free tier — keyless w/ desktop headers; mimo/big-pickle/
+///    hy3 have VISION (screenshots are our core input), tools work
+/// 2. OVHcloud AI Endpoints — fully anonymous (no key at all); Qwen2.5-VL-72B
+///    reads screen text OCR-grade, but only ~2 RPM so it's a fallback
+/// 3. LLM7.io — anonymous text-only (vision models need a pro-tier key)
+/// 4. local ollama as last resort
 impl Config {
     pub fn with_defaults() -> Self {
         Config {
@@ -73,13 +78,29 @@ impl Config {
                 ProviderCfg {
                     id: "zen-free".into(),
                     base_url: "https://opencode.ai/zen/v1".into(),
-                    // big-pickle was down upstream on 2026-08-25 — rotation is the point
+                    // models go down randomly ("Endpoint is unavailable") — rotation is the point
                     models: vec![
-                        "big-pickle".into(),
-                        "deepseek-v4-flash-free".into(),
-                        "mimo-v2.5-free".into(),
-                        "nemotron-3-ultra-free".into(),
+                        "mimo-v2.5-free".into(),       // vision + clean reasoning split
+                        "big-pickle".into(),           // vision (streams CoT into content!)
+                        "hy3-free".into(),             // vision
+                        "deepseek-v4-flash-free".into(), // text
+                        "nemotron-3-ultra-free".into(),  // text (rejects images -> rotates)
                     ],
+                    key_account: None,
+                },
+                ProviderCfg {
+                    id: "ovh-anon".into(),
+                    base_url: "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1".into(),
+                    models: vec![
+                        "Qwen2.5-VL-72B-Instruct".into(),   // vision, no auth
+                        "Meta-Llama-3_3-70B-Instruct".into(),
+                    ],
+                    key_account: None,
+                },
+                ProviderCfg {
+                    id: "llm7-anon".into(),
+                    base_url: "https://api.llm7.io/v1".into(),
+                    models: vec!["minimax-m2.7".into()], // anon tier is text-only
                     key_account: None,
                 },
                 ProviderCfg {

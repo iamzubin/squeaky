@@ -90,7 +90,7 @@ pub struct LlmRegistry {
     start: AtomicUsize, // rotates past endpoints that failed recently
 }
 
-const MAX_ATTEMPTS: usize = 4;
+const MAX_ATTEMPTS: usize = 8; // ring spans zen(5) + ovh(2) + llm7(1) + ollama
 const BACKOFF_MS: u64 = 500;
 
 impl LlmRegistry {
