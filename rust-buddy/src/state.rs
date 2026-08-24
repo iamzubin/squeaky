@@ -9,12 +9,12 @@ pub const HOT_X: i32 = 5;
 pub const HOT_Y: i32 = 3;
 pub const HIDDEN: i32 = -1000; // park-offscreen margin
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Mode {
     Hidden, // idle (ink may still be fading)
     Draw,   // hotkey held: buddy is the pen, ink trails the cursor
-    Fly { sx: f64, sy: f64, tx: f64, ty: f64, t0: i64, dur: f64, ret: bool }, // demo: bezier flight
-    Point { x: i32, y: i32, until: i64 }, // demo: bubble "right here!"
+    Fly { sx: f64, sy: f64, tx: f64, ty: f64, t0: i64, dur: f64, ret: bool }, // bezier flight (demo + agent)
+    Point { x: i32, y: i32, until: i64, label: String }, // bubble at a spot ("click here!", agent labels…)
 }
 
 // synthetic pen driver for the `scribble` self-test (no real hotkey needed)
@@ -23,6 +23,15 @@ pub struct Syn {
     pub cy: f64,
     pub i: i32,
     pub n: i32,
+}
+
+/// One command from the agent sidecar (director.jsonl feed).
+#[derive(Clone)]
+pub enum DirectorCmd {
+    /// fly the buddy to x,y and hold a label bubble there
+    Fly { x: i32, y: i32, label: String },
+    /// show a speech bubble at the buddy's current position
+    Say { text: String },
 }
 
 pub struct Ctx {
@@ -45,4 +54,8 @@ pub struct Ctx {
     pub last_session_id: Option<String>, // ink session the next transcript belongs to
     pub model_name: String,      // active whisper model (for status.json)
     pub last_transcript: String, // most recent voice transcript (for status.json)
+    // agent director feed (~/.local/state/heyclicky/director.jsonl)
+    pub director_mtime: u64,     // last-seen mtime (poll trigger)
+    pub director_seen: usize,    // lines already executed
+    pub pending_label: String,   // bubble label for the flight in progress
 }

@@ -7,6 +7,7 @@
 //! Modes: (none)|hotkey = draw · scribble = self-test · demo = agent mock ·
 //! <secs> = plain buddy-follow.
 
+mod director;
 mod flight;
 mod hotkey;
 mod hypr;
@@ -23,7 +24,7 @@ use gdk4 as gdk;
 use gtk4::{glib, Application, ApplicationWindow, CssProvider, DrawingArea};
 use ink::render_trail;
 use session::{capture_for_agent, session_record, wall_ms};
-use state::{Ctx, Mode, Syn, HIDDEN, HOT_X, HOT_Y, SIZE};
+use state::{Ctx, DirectorCmd, Mode, Syn, HIDDEN, HOT_X, HOT_Y, SIZE};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::env;
@@ -118,6 +119,9 @@ fn main() -> glib::ExitCode {
             last_session_id: None,
             model_name: cfg.model.clone(),
             last_transcript: String::new(),
+            director_mtime: 0,
+            director_seen: 0,
+            pending_label: "right here!".into(),
         }));
 
         // buddy triangle (curved bottom), color from settings cursor_color
@@ -158,7 +162,9 @@ fn main() -> glib::ExitCode {
             da.set_draw_func(move |_, cr, _, _| {
                 let c = ctx_c.borrow();
                 let now = glib::monotonic_time();
-                match c.mode {
+                // Mode carries a String label now -> match on an owned clone
+                let mode = c.mode.clone();
+                match mode {
                     Mode::Hidden | Mode::Draw => {
                         // comet trail: each point fades individually, tail-first;
                         // ink color matches the buddy (cursor_color)
@@ -186,16 +192,16 @@ fn main() -> glib::ExitCode {
                         cr.arc(hx, hy, 3.0, 0.0, 2.0 * PI);
                         let _ = cr.fill();
                     }
-                    Mode::Point { x, y, until } => {
-                        // bubble "right here!" (streamed in real app; static here)
+                    Mode::Point { x, y, until, label } => {
+                        // bubble at a spot (agent labels: "click here!", answers…)
                         let left = (until - now).max(0) as f64 / 1_000_000.0;
-                        let a = (left / (POINT_HOLD_MS as f64 / 1_000_000.0)).clamp(0.35, 1.0);
+                        let hold = bubble_hold_ms(&label) as f64 / 1_000_000.0;
+                        let a = (left / hold).clamp(0.35, 1.0);
                         let bx = x as f64 + 12.0;
                         let by = y as f64 - 26.0;
                         cr.select_font_face("Sans", FontSlant::Normal, FontWeight::Bold);
                         cr.set_font_size(11.0);
-                        let label = "right here!";
-                        let te = cr.text_extents(label).unwrap();
+                        let te = cr.text_extents(&label).unwrap();
                         cr.set_source_rgba(0.55, 0.36, 0.96, 0.95 * a);
                         let rw = te.width() + 14.0;
                         let rh = te.height() + 10.0;
@@ -216,7 +222,7 @@ fn main() -> glib::ExitCode {
                         let _ = cr.fill();
                         cr.set_source_rgba(1.0, 1.0, 1.0, a);
                         cr.move_to(bx + 7.0, by + te.height() + 5.0);
-                        let _ = cr.show_text(label);
+                        let _ = cr.show_text(&label);
                     }
                 }
             });
@@ -307,6 +313,30 @@ fn main() -> glib::ExitCode {
                     });
                 }
 
+                // agent director feed: fly/point/say commands from the sidecar
+                let mut dseen = c.director_seen;
+                let mut dmt = c.director_mtime;
+                let cmds = director::poll(&mut dseen, &mut dmt);
+                c.director_seen = dseen;
+                c.director_mtime = dmt;
+                for cmd in cmds {
+                    match cmd {
+                        DirectorCmd::Fly { x, y, label } => {
+                            println!("DIRECTOR: fly {},{} ({})", x, y, label);
+                            c.pending_label = label;
+                            c.queue.clear();
+                            let (sx, sy) = c.buddy_pos;
+                            c.mode = flight_params(sx, sy, x, y, now, false);
+                        }
+                        DirectorCmd::Say { text } => {
+                            println!("DIRECTOR: say \"{}\"", text);
+                            let (bx, by) = c.buddy_pos;
+                            c.mode = Mode::Point { x: bx, y: by, until: now + bubble_hold_ms(&text) * 1000, label: text };
+                        }
+                    }
+                    da_c.queue_draw();
+                }
+
                 // demo autostart: fake an "agent" pointing at 3 spots
                 if is_demo_c && !demo_started && now > 2_000_000 {
                     demo_started = true;
@@ -318,7 +348,9 @@ fn main() -> glib::ExitCode {
                     }
                 }
 
-                match c.mode {
+                // Mode carries a String label -> match on an owned clone
+                let mode = c.mode.clone();
+                match mode {
                     Mode::Hidden => {
                         // prune fully-decayed points
                         let life = ink::trail_life_us();
@@ -411,13 +443,22 @@ fn main() -> glib::ExitCode {
                                 layershell::set_margins(&buddy_c, HIDDEN, HIDDEN);
                                 println!("agent done -> hidden");
                             } else {
-                                c.mode = Mode::Point { x: tx as i32, y: ty as i32, until: now + POINT_HOLD_MS * 1000 };
-                                println!("POINT at {},{} 'right here!'", tx as i32, ty as i32);
+                                let label = if c.pending_label.is_empty() {
+                                    "right here!".to_string()
+                                } else {
+                                    c.pending_label.clone()
+                                };
+                                c.mode = Mode::Point { x: tx as i32, y: ty as i32, until: now + bubble_hold_ms(&label) * 1000, label };
+                                println!("POINT at {},{}", tx as i32, ty as i32);
                             }
                         }
                     }
-                    Mode::Point { x, y, until } => {
+                    Mode::Point { x, y, until, .. } => {
                         if now >= until {
+                            // reset label for the next flight (demo defaults)
+                            if !c.queue.is_empty() || c.pending_label != "right here!" {
+                                c.pending_label = "right here!".into();
+                            }
                             if let Some((tx, ty)) = c.queue.pop_front() {
                                 let (sx, sy) = c.buddy_pos;
                                 c.mode = flight_params(sx, sy, tx, ty, now, false);
@@ -511,6 +552,11 @@ fn main() -> glib::ExitCode {
     });
 
     app.run_with_args::<&str>(&[])
+}
+
+/// Bubble hold: base point-hold, longer for longer agent text.
+fn bubble_hold_ms(label: &str) -> i64 {
+    POINT_HOLD_MS.max(2500 + 55 * label.len() as i64)
 }
 
 fn parse_hex_color(hex: &str) -> (f64, f64, f64) {
